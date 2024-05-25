@@ -52,20 +52,28 @@ class RedisServer
                     if (line.StartsWith("*"))
                     {
                         int numberOfElements = int.Parse(line.Substring(1));
+                        string[] elements = new string[numberOfElements];
+
                         for (int i = 0; i < numberOfElements; i++)
                         {
-                            string bulkStringLength = reader.ReadLine(); // Read $4
-                            string command = reader.ReadLine();          // Read PING
+                            string bulkStringLength = reader.ReadLine(); // Read $N
+                            elements[i] = reader.ReadLine();             // Read actual string
+                        }
 
-                            Console.WriteLine($"Received bulk string length: {bulkStringLength}");
-                            Console.WriteLine($"Received command: {command}");
-
-                            if (command == "PING")
-                            {
-                                // Send +PONG\r\n response
-                                writer.WriteLine("+PONG");
-                                Console.WriteLine("Sent response: +PONG");
-                            }
+                        string command = elements[0].ToUpper();
+                        if (command == "PING")
+                        {
+                            // Send +PONG\r\n response
+                            writer.WriteLine("+PONG");
+                            Console.WriteLine("Sent response: +PONG");
+                        }
+                        else if (command == "ECHO" && numberOfElements > 1)
+                        {
+                            string message = elements[1];
+                            string response = $"${message.Length}\r\n{message}";
+                            // Send bulk string response
+                            writer.WriteLine(response);
+                            Console.WriteLine($"Sent response: {response}");
                         }
                     }
                 }
