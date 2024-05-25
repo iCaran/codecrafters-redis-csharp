@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -7,6 +8,9 @@ using System.Threading;
 
 class RedisServer
 {
+    // A thread-safe dictionary to store key-value pairs
+    private static ConcurrentDictionary<string, string> dataStore = new ConcurrentDictionary<string, string>();
+
     static void Main()
     {
         // Debugging logs
@@ -56,8 +60,8 @@ class RedisServer
 
                         for (int i = 0; i < numberOfElements; i++)
                         {
-                            string bulkStringLength = reader.ReadLine(); // Read $N
-                            elements[i] = reader.ReadLine();             // Read actual string
+                            reader.ReadLine(); // Read $N
+                            elements[i] = reader.ReadLine(); // Read actual string
                         }
 
                         string command = elements[0].ToUpper();
@@ -74,6 +78,32 @@ class RedisServer
                             // Send bulk string response
                             writer.WriteLine(response);
                             Console.WriteLine($"Sent response: {response}");
+                        }
+                        else if (command == "SET" && numberOfElements > 2)
+                        {
+                            string key = elements[1];
+                            string value = elements[2];
+                            dataStore[key] = value;
+                            // Send +OK\r\n response
+                            writer.WriteLine("+OK");
+                            Console.WriteLine("Sent response: +OK");
+                        }
+                        else if (command == "GET" && numberOfElements > 1)
+                        {
+                            string key = elements[1];
+                            if (dataStore.TryGetValue(key, out string value))
+                            {
+                                string response = $"${value.Length}\r\n{value}";
+                                // Send bulk string response
+                                writer.WriteLine(response);
+                                Console.WriteLine($"Sent response: {response}");
+                            }
+                            else
+                            {
+                                // Send null bulk string response
+                                writer.WriteLine("$-1");
+                                Console.WriteLine("Sent response: $-1");
+                            }
                         }
                     }
                 }
