@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 class RedisServer
 {
@@ -16,11 +17,22 @@ class RedisServer
         server.Start();
         Console.WriteLine("Server started, waiting for connections...");
 
-        // Accept a client connection
-        using (Socket clientSocket = server.AcceptSocket())
+        while (true)
         {
+            // Accept a client connection
+            Socket clientSocket = server.AcceptSocket();
             Console.WriteLine("Client connected.");
 
+            // Handle the client connection in a new thread
+            Thread clientThread = new Thread(() => HandleClient(clientSocket));
+            clientThread.Start();
+        }
+    }
+
+    static void HandleClient(Socket clientSocket)
+    {
+        try
+        {
             // NetworkStream to read and write data
             using (NetworkStream networkStream = new NetworkStream(clientSocket))
             using (StreamReader reader = new StreamReader(networkStream, Encoding.UTF8))
@@ -58,6 +70,14 @@ class RedisServer
                     }
                 }
             }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Exception: {e.Message}");
+        }
+        finally
+        {
+            clientSocket.Close();
         }
     }
 }
