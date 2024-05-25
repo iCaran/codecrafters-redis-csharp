@@ -12,13 +12,25 @@ class RedisServer
     // A thread-safe dictionary to store key-value pairs and their expiry times
     private static ConcurrentDictionary<string, (string Value, DateTime? Expiry)> dataStore = new ConcurrentDictionary<string, (string, DateTime?)>();
 
-    static void Main()
+    static void Main(string[] args)
     {
+        int port = 6379; // Default port
+
+        // Parse command-line arguments
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--port" && i + 1 < args.Length && int.TryParse(args[i + 1], out int parsedPort))
+            {
+                port = parsedPort;
+            }
+        }
+
         // Debugging logs
         Console.WriteLine("Logs from your program will appear here!");
+        Console.WriteLine($"Starting server on port {port}");
 
-        // Set up the server to listen on any IP address, port 6379
-        TcpListener server = new TcpListener(IPAddress.Any, 6379);
+        // Set up the server to listen on any IP address and the specified port
+        TcpListener server = new TcpListener(IPAddress.Any, port);
         server.Start();
         Console.WriteLine("Server started, waiting for connections...");
 
