@@ -132,6 +132,18 @@ class RedisServer
                                 Console.WriteLine("Sent response: $-1");
                             }
                         }
+                        else if (command == "INFO" && numberOfElements > 1)
+                        {
+                            string section = elements[1].ToLower();
+                            if (section == "replication")
+                            {
+                                string infoResponse = "role:master\r\n";
+                                string response = $"${infoResponse.Length}\r\n{infoResponse}";
+                                // Send bulk string response
+                                writer.WriteLine(response);
+                                Console.WriteLine($"Sent response: {response}");
+                            }
+                        }
                     }
                 }
             }
