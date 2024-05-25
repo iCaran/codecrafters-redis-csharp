@@ -26,27 +26,34 @@ class RedisServer
             using (StreamReader reader = new StreamReader(networkStream, Encoding.UTF8))
             using (StreamWriter writer = new StreamWriter(networkStream, new UTF8Encoding(false)) { NewLine = "\r\n", AutoFlush = true })
             {
-                // Read the incoming RESP data
-                string line = reader.ReadLine();
-                Console.WriteLine($"Received command: {line}");
-
-                // Check if it's the start of a RESP array
-                if (line != null && line.StartsWith("*"))
+                // Continuously read commands from the client
+                while (true)
                 {
-                    int numberOfElements = int.Parse(line.Substring(1));
-                    for (int i = 0; i < numberOfElements; i++)
+                    string line = reader.ReadLine();
+                    if (line == null)
                     {
-                        string bulkStringLength = reader.ReadLine(); // Read $4
-                        string command = reader.ReadLine();          // Read PING
+                        break; // Client disconnected
+                    }
+                    Console.WriteLine($"Received command: {line}");
 
-                        Console.WriteLine($"Received bulk string length: {bulkStringLength}");
-                        Console.WriteLine($"Received command: {command}");
-
-                        if (command == "PING")
+                    // Check if it's the start of a RESP array
+                    if (line.StartsWith("*"))
+                    {
+                        int numberOfElements = int.Parse(line.Substring(1));
+                        for (int i = 0; i < numberOfElements; i++)
                         {
-                            // Send +PONG\r\n response
-                            writer.WriteLine("+PONG");
-                            Console.WriteLine("Sent response: +PONG");
+                            string bulkStringLength = reader.ReadLine(); // Read $4
+                            string command = reader.ReadLine();          // Read PING
+
+                            Console.WriteLine($"Received bulk string length: {bulkStringLength}");
+                            Console.WriteLine($"Received command: {command}");
+
+                            if (command == "PING")
+                            {
+                                // Send +PONG\r\n response
+                                writer.WriteLine("+PONG");
+                                Console.WriteLine("Sent response: +PONG");
+                            }
                         }
                     }
                 }
