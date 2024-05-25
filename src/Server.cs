@@ -5,11 +5,12 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 class RedisServer
 {
-    // A thread-safe dictionary to store key-value pairs
-    private static ConcurrentDictionary<string, string> dataStore = new ConcurrentDictionary<string, string>();
+    // A thread-safe dictionary to store key-value pairs and their expiry times
+    private static ConcurrentDictionary<string, (string Value, DateTime? Expiry)> dataStore = new ConcurrentDictionary<string, (string, DateTime?)>();
 
     static void Main()
     {
@@ -20,6 +21,9 @@ class RedisServer
         TcpListener server = new TcpListener(IPAddress.Any, 6379);
         server.Start();
         Console.WriteLine("Server started, waiting for connections...");
+
+        // Start a background task to clean up expired keys
+        Task.Run(() => CleanupExpiredKeys());
 
         while (true)
         {
@@ -83,7 +87,18 @@ class RedisServer
                         {
                             string key = elements[1];
                             string value = elements[2];
-                            dataStore[key] = value;
+                            DateTime? expiry = null;
+
+                            // Check for PX argument
+                            if (numberOfElements > 4 && elements[3].ToUpper() == "PX")
+                            {
+                                if (int.TryParse(elements[4], out int expiryTime))
+                                {
+                                    expiry = DateTime.UtcNow.AddMilliseconds(expiryTime);
+                                }
+                            }
+
+                            dataStore[key] = (value, expiry);
                             // Send +OK\r\n response
                             writer.WriteLine("+OK");
                             Console.WriteLine("Sent response: +OK");
@@ -91,9 +106,9 @@ class RedisServer
                         else if (command == "GET" && numberOfElements > 1)
                         {
                             string key = elements[1];
-                            if (dataStore.TryGetValue(key, out string value))
+                            if (dataStore.TryGetValue(key, out var value) && (value.Expiry == null || value.Expiry > DateTime.UtcNow))
                             {
-                                string response = $"${value.Length}\r\n{value}";
+                                string response = $"${value.Value.Length}\r\n{value.Value}";
                                 // Send bulk string response
                                 writer.WriteLine(response);
                                 Console.WriteLine($"Sent response: {response}");
@@ -116,6 +131,23 @@ class RedisServer
         finally
         {
             clientSocket.Close();
+        }
+    }
+
+    static void CleanupExpiredKeys()
+    {
+        while (true)
+        {
+            foreach (var key in dataStore.Keys)
+            {
+                if (dataStore.TryGetValue(key, out var value) && value.Expiry != null && value.Expiry <= DateTime.UtcNow)
+                {
+                    dataStore.TryRemove(key, out _);
+                    Console.WriteLine($"Expired key removed: {key}");
+                }
+            }
+            // Sleep for a short period before checking again
+            Thread.Sleep(100);
         }
     }
 }
